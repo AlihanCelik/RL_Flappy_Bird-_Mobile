@@ -62,6 +62,7 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
 
     // PyTorch Lite
-    implementation("org.pytorch:pytorch_android_lite:2.1.0")
-    implementation("org.pytorch:pytorch_android_torchvision_lite:2.1.0")
+    implementation("org.pytorch:pytorch_android:1.13.0")
+    implementation("org.pytorch:pytorch_android_torchvision:1.13.0")
+
 }
