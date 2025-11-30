@@ -35,7 +35,6 @@ class GameState(
     val upperPipes = mutableListOf<Pair<Int, Int>>() // x,y
     val lowerPipes = mutableListOf<Pair<Int, Int>>()
 
-    // Fizik sabitleri (288x512 için uygundur)
     var pipeVelX = -4
     var playerVelY = 0
     var playerMaxVelY = 10
@@ -55,11 +54,10 @@ class GameState(
         playerX = (screenWidth * 0.2).toInt()
         playerY = ((screenHeight - playerHeight) / 2)
         baseX = 0
-        playerVelY = 0 // Reset'te hızı sıfırla
+        playerVelY = 0
         upperPipes.clear()
         lowerPipes.clear()
 
-        // İlk boruları biraz daha ileriye koyalım ki oyun başlar başlamaz ölmesin
         val startX = screenWidth + 100
         val new1 = getRandomPipe(startX)
         val new2 = getRandomPipe(startX + (screenWidth / 2) + (pipeWidth / 2))
@@ -69,13 +67,9 @@ class GameState(
     }
 
     private fun addPipe(pos: Pair<Int, Int>) {
-        // pos.first = lowerPipeY
-        // Upper pipe Y hesabı: gap'in başladığı yer - pipe boyu
         val upperY = pos.first - gapSize - pipeHeight
         val lowerY = pos.first
 
-        // x coordinate is stored separately or implicitly managed?
-        // Yapıyı değiştirmemek için parametre olarak gelen x'i kullanacağız
         val x = pos.second
 
         upperPipes.add(Pair(x, upperY))
@@ -84,8 +78,6 @@ class GameState(
 
     fun frameStep(inputActions: IntArray): Pair<Float, Boolean> {
         if (inputActions.sum() != 1) {
-            // Hata vermek yerine sessizce devam et veya logla
-            // throw IllegalArgumentException("Multiple input actions!")
         }
 
         var reward = 0.1f
@@ -95,11 +87,9 @@ class GameState(
             if (playerY > -2 * playerHeight) {
                 playerVelY = playerFlapAcc
                 playerFlapped = true
-                // Flap sesi çalınabilir
             }
         }
 
-        // Skor kontrolü
         val playerMidPos = playerX + playerWidth / 2
         for (pipe in upperPipes) {
             val pipeMidPos = pipe.first + pipeWidth / 2
@@ -109,17 +99,14 @@ class GameState(
             }
         }
 
-        // Animasyon döngüsü
         if ((loopIter + 1) % 3 == 0) {
             playerIndex = (playerIndex + 1) % 4
             if (playerIndex == 3) playerIndex = 1
         }
         loopIter = (loopIter + 1) % 30
 
-        // Zemin hareketi
         baseX = -((-baseX + 100) % baseShift)
 
-        // Fizik
         if (playerVelY < playerMaxVelY && !playerFlapped) {
             playerVelY += playerAccY
         }
@@ -128,54 +115,43 @@ class GameState(
         val groundY = (screenHeight * 0.79).toInt()
         playerY += min(playerVelY, groundY - playerY - playerHeight)
 
-        // Tavana çarpma kontrolü (ölmez ama yukarı gitmez)
         if (playerY < 0) playerY = 0
 
-        // Boruları hareket ettir
         for (i in upperPipes.indices) {
             upperPipes[i] = Pair(upperPipes[i].first + pipeVelX, upperPipes[i].second)
             lowerPipes[i] = Pair(lowerPipes[i].first + pipeVelX, lowerPipes[i].second)
         }
 
-        // Yeni boru ekle / Eski boruyu sil
         if (upperPipes.isNotEmpty()) {
             val firstPipeX = upperPipes[0].first
-            // Ekrandan çıktıysa sil
             if (firstPipeX < -pipeWidth) {
                 upperPipes.removeAt(0)
                 lowerPipes.removeAt(0)
             }
 
-            // Son borunun konumuna göre yeni boru ekle
             val lastPipeX = upperPipes.last().first
-            // Ekranın yarısından biraz fazlası kadar mesafe olduğunda yeni boru
             if (lastPipeX < screenWidth - (screenWidth / 2) - (pipeWidth / 2)) {
                 val newPipe = getRandomPipe(screenWidth + 10)
                 addPipe(newPipe)
             }
         } else {
-            // Hiç boru kalmadıysa (nadiren olur ama güvenli kod için)
             val newPipe = getRandomPipe(screenWidth + 10)
             addPipe(newPipe)
         }
 
-        // Çarpışma Kontrolü (Collision)
-        // 1. Zemin
         if (playerY + playerHeight >= groundY - 1) {
             terminal = true
             reward = -1f
-            reset() // Reset logic GameActivity tarafından yönetilebilir ama burada da kalabilir
+            reset()
             return Pair(reward, terminal)
         }
 
-        // 2. Borular
         val playerRect = Rect(playerX, playerY, playerX + playerWidth, playerY + playerHeight)
 
         for (i in upperPipes.indices) {
             val u = upperPipes[i]
             val l = lowerPipes[i]
 
-            // Basit Rect Collision (Hitboxlar biraz küçültülebilir daha adil oyun için)
             val uRect = Rect(u.first, u.second, u.first + pipeWidth, u.second + pipeHeight)
             val lRect = Rect(l.first, l.second, l.first + pipeWidth, l.second + pipeHeight)
 
@@ -189,11 +165,7 @@ class GameState(
 
         return Pair(reward, terminal)
     }
-
-    // Dönüş tipi: Pair(LowerPipeY, X_Position)
     private fun getRandomPipe(xPos: Int): Pair<Int, Int> {
-        // gapY: Alt borunun başladığı Y koordinatı
-        // Rastgele bir yükseklik seç (minY ile maxY arası)
         val gapY = Random.nextInt(minY + gapSize, maxY)
         return Pair(gapY, xPos)
     }

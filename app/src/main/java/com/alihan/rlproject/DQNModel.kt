@@ -11,12 +11,11 @@ class DQNModel(val module: Module) {
 
     companion object {
         fun loadFromAssets(assetPath: String): DQNModel {
-            val module = Module.load(assetPath) // for assets: copy to file and load path
+            val module = Module.load(assetPath)
             return DQNModel(module)
         }
     }
 
-    // preprocess: Bitmap -> grayscale 84x84, values 0 or 255 normalized to [0,1]
     fun preprocess(bitmap: Bitmap): FloatArray {
         val resized = Bitmap.createScaledBitmap(bitmap, 84, 84, false)
         val w = 84
@@ -30,7 +29,7 @@ class DQNModel(val module: Module) {
             val g = (p shr 8) and 0xff
             val b = p and 0xff
             val gray = ((0.299 * r + 0.587 * g + 0.114 * b)).toInt()
-            arr[i] = if (gray > 0) 1.0f else 0.0f // same binarization as Python
+            arr[i] = if (gray > 0) 1.0f else 0.0f
         }
         return arr
     }
@@ -41,7 +40,6 @@ class DQNModel(val module: Module) {
     }
 
     private fun getInputTensor(): Tensor {
-        // shape: [1, 4, 84, 84]
         val channels = 4
         val w = 84
         val h = 84
@@ -59,7 +57,6 @@ class DQNModel(val module: Module) {
         val processed = preprocess(bitmapFrame)
         appendFrame(processed)
         if (frameStack.size < 4) {
-            // pad with last frame
             while (frameStack.size < 4) frameStack.addLast(processed)
         }
         val input = getInputTensor()

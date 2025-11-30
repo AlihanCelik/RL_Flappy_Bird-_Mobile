@@ -40,7 +40,6 @@ class GameView @JvmOverloads constructor(
     fun initGame(viewWidth: Int, viewHeight: Int) {
         val assets = AssetLoader(context)
 
-        // Assetleri yükle
         bg = assets.loadBitmap("sprites/background-black.png")
         base = assets.loadBitmap("sprites/base.png")
         playerFrames = arrayOf(
@@ -50,18 +49,15 @@ class GameView @JvmOverloads constructor(
         )
 
         val rawPipe = assets.loadBitmap("sprites/pipe-green.png")
-        pipeBottom = rawPipe // Alt boru düz
+        pipeBottom = rawPipe
 
-        // Üst boruyu ŞİMDİ çevir (Render döngüsünde yapma, performans öldürür)
         val matrix = Matrix()
         matrix.postRotate(180f)
         pipeTop = Bitmap.createBitmap(rawPipe, 0, 0, rawPipe.width, rawPipe.height, matrix, false)
 
-        // Sanal ekran buffer'ını oluştur
         gameBitmap = Bitmap.createBitmap(LOGICAL_WIDTH, LOGICAL_HEIGHT, Bitmap.Config.ARGB_8888)
         gameCanvas = Canvas(gameBitmap)
 
-        // Ekrana sığdırmak için ölçekleme matrisi hesapla
         val sx = viewWidth.toFloat() / LOGICAL_WIDTH
         val sy = viewHeight.toFloat() / LOGICAL_HEIGHT
         scaleMatrix = Matrix()
@@ -69,7 +65,6 @@ class GameView @JvmOverloads constructor(
 
         spritesReady = true
 
-        // GameState'e SANAL boyutları gönderiyoruz, gerçek ekran boyutunu değil
         gameState = GameState(
             LOGICAL_WIDTH, LOGICAL_HEIGHT,
             playerFrames[0].width, playerFrames[0].height,
@@ -86,8 +81,7 @@ class GameView @JvmOverloads constructor(
             while (running.get()) {
                 val canvas = holder.lockCanvas()
                 if (canvas != null) {
-                    drawGame() // Buffer'a çiz
-                    // Buffer'ı ekrana scale ederek çiz
+                    drawGame()
                     canvas.drawBitmap(gameBitmap, scaleMatrix, null)
                     holder.unlockCanvasAndPost(canvas)
                 }
@@ -102,37 +96,25 @@ class GameView @JvmOverloads constructor(
         try { thread?.join() } catch (e: InterruptedException) {}
     }
 
-    // Tüm çizim işlemleri gameCanvas (288x512) üzerine yapılır
     private fun drawGame() {
         if (!spritesReady) return
-
-        // Arka plan
         gameCanvas.drawBitmap(bg, 0f, 0f, null)
 
-        // Borular
         for (i in gameState.upperPipes.indices) {
             val u = gameState.upperPipes[i]
             val l = gameState.lowerPipes[i]
 
-            // Önceden çevrilmiş pipeTop kullanılıyor
             gameCanvas.drawBitmap(pipeTop, u.first.toFloat(), u.second.toFloat(), null)
             gameCanvas.drawBitmap(pipeBottom, l.first.toFloat(), l.second.toFloat(), null)
         }
 
-        // Zemin
         gameCanvas.drawBitmap(base, gameState.baseX.toFloat(), (LOGICAL_HEIGHT * 0.79f), null)
 
-        // Kuş
         val frame = playerFrames[gameState.playerIndex % playerFrames.size]
-        // Kuşun dönüş açısını (rotasyonunu) eklemek isterseniz buraya matrix ekleyebilirsiniz
         gameCanvas.drawBitmap(frame, gameState.playerX.toFloat(), gameState.playerY.toFloat(), null)
     }
-
-    // AI için frame yakalama
     fun captureFrame(): Bitmap? {
         if (!spritesReady) return null
-        // Doğrudan sanal buffer'ı (288x512) döndür, model bunu daha iyi işler.
-        // Copy oluşturuyoruz çünkü thread çakışması olmasın.
         return gameBitmap.copy(Bitmap.Config.ARGB_8888, false)
     }
 
