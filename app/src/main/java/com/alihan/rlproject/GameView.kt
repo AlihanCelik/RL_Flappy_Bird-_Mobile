@@ -17,7 +17,6 @@ class GameView @JvmOverloads constructor(
     private lateinit var gameState: GameState
     private var spritesReady = false
 
-    // Python: 288x512 sabit çözünürlük
     private val LOGICAL_WIDTH = 288
     private val LOGICAL_HEIGHT = 512
 
@@ -28,8 +27,8 @@ class GameView @JvmOverloads constructor(
     private lateinit var bg: Bitmap
     private lateinit var base: Bitmap
     private lateinit var playerFrames: Array<Bitmap>
-    private lateinit var pipeTop: Bitmap    // Rotated (Üst Boru)
-    private lateinit var pipeBottom: Bitmap // Normal (Alt Boru)
+    private lateinit var pipeTop: Bitmap
+    private lateinit var pipeBottom: Bitmap
 
     init { holder.addCallback(this) }
 
@@ -46,19 +45,15 @@ class GameView @JvmOverloads constructor(
 
         val rawPipe = assets.loadBitmap("sprites/pipe-green.png")
 
-        // Python: IMAGES['pipe'][1] -> Normal (Alt Boru)
         pipeBottom = rawPipe
 
-        // Python: IMAGES['pipe'][0] -> Rotated 180 (Üst Boru)
         val matrix = Matrix()
         matrix.postRotate(180f)
         pipeTop = Bitmap.createBitmap(rawPipe, 0, 0, rawPipe.width, rawPipe.height, matrix, false)
 
-        // Sanal ekran buffer
         gameBitmap = Bitmap.createBitmap(LOGICAL_WIDTH, LOGICAL_HEIGHT, Bitmap.Config.ARGB_8888)
         gameCanvas = Canvas(gameBitmap)
 
-        // Ölçekleme matrisi (Telefona sığdırmak için)
         val sx = viewWidth.toFloat() / LOGICAL_WIDTH
         val sy = viewHeight.toFloat() / LOGICAL_HEIGHT
         scaleMatrix = Matrix()
@@ -100,24 +95,17 @@ class GameView @JvmOverloads constructor(
     private fun drawGame() {
         if (!spritesReady) return
 
-        // 1. Arka plan
         gameCanvas.drawBitmap(bg, 0f, 0f, null)
 
-        // 2. Borular
-        // Python: for uPipe, lPipe in zip(upperPipes, lowerPipes):
         for (i in gameState.upperPipes.indices) {
-            val u = gameState.upperPipes[i] // (x, y) Pair
-            val l = gameState.lowerPipes[i] // (x, y) Pair
+            val u = gameState.upperPipes[i]
+            val l = gameState.lowerPipes[i]
 
-            // Üst boru: Koordinat negatiftir (yukarı taşar), pipeTop çizilir
             gameCanvas.drawBitmap(pipeTop, u.first.toFloat(), u.second.toFloat(), null)
 
-            // Alt boru: pipeBottom çizilir
             gameCanvas.drawBitmap(pipeBottom, l.first.toFloat(), l.second.toFloat(), null)
         }
 
-        // 3. Zemin (Python: BASEY = SCREENHEIGHT * 0.79 -> 512 * 0.79 = 404)
-        // Zemin boruların üstüne çizilmeli
         val baseY = (LOGICAL_HEIGHT * 0.79f)
         gameCanvas.drawBitmap(base, gameState.baseX.toFloat(), baseY, null)
 
@@ -128,20 +116,7 @@ class GameView @JvmOverloads constructor(
 
     fun captureFrame(): Bitmap? {
         if (!spritesReady) return null
-
-        // --- KRİTİK DÜZELTME ---
-        // Python kodu: image = image[0:288, 0:404]
-        // Pygame'de array yapısı (Width, Height) şeklindedir.
-        // Yani Python, genişliğin tamamını (288), yüksekliğin ise sadece üst kısmını (0-404) alıyor.
-        // Zemini (Base) görüntüden atıyor.
-
-        // Senin 'gameBitmap'in şu an 288x512.
-        // Yapay zekaya göndermeden önce bunu 288x404 olarak KIRPMALIYIZ.
-        // Eğer bunu yapmazsak, görüntü 84x84'e sıkıştırıldığında kuşun ve boruların boyu basıklaşır,
-        // modelin kafası karışır.
-
-        // Sadece üstteki 404 piksellik kısmı al (Zemini at)
-        return Bitmap.createBitmap(gameBitmap, 0, 0, 288, 404)
+        return gameBitmap
     }
 
     fun step(action: IntArray): Pair<Float, Boolean> {

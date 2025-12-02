@@ -1,6 +1,11 @@
 package com.alihan.rlproject
 
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Matrix
+import android.graphics.Paint
 import org.pytorch.IValue
 import org.pytorch.Module
 import org.pytorch.Tensor
@@ -8,6 +13,18 @@ import org.pytorch.Tensor
 class DQNModel(val module: Module) {
 
     private val frameStack = ArrayDeque<FloatArray>(4)
+
+    private val processBitmap = Bitmap.createBitmap(84, 84, Bitmap.Config.ARGB_8888)
+    private val processCanvas = Canvas(processBitmap)
+    private val scaleMatrix = Matrix()
+    private val paint = Paint()
+    private val pixels = IntArray(84 * 84)
+
+    init {
+        val cm = ColorMatrix()
+        cm.setSaturation(0f) // Grayscale
+        paint.colorFilter = ColorMatrixColorFilter(cm)
+    }
 
     companion object {
         fun loadFromAssets(assetPath: String): DQNModel {
@@ -17,40 +34,31 @@ class DQNModel(val module: Module) {
     }
 
     fun preprocess(bitmap: Bitmap): FloatArray {
-        // 1. ADIM: KIRPMA (CROP)
-        // Python'daki image[0:288, 0:404] mantığı.
-        // Ekranın altındaki zemini (yaklaşık son 108 pikseli) atıyoruz.
-        // Bitmap 288x512 boyutunda geliyor varsayıyoruz (GameView'daki LOGICAL boyutlar).
+        // 1. Matris Ayarı:
+        // Kaynak (Src): 288x404 (Zemini kestik) -> Hedef (Dst): 84x84
+        // scaleX = 84 / 288
+        // scaleY = 84 / 404
+        val sx = 84f / 288f
+        val sy = 84f / 404f
+        scaleMatrix.setScale(sx, sy)
 
-        val croppedWidth = bitmap.width
-        // Yükseklik 404 piksel olacak (veya oransal olarak yaklaşık %79'u)
-        val croppedHeight = if (bitmap.height > 404) 404 else bitmap.height
+        // 2. Çizim (Crop + Resize + Grayscale tek seferde)
+        // Canvas, gelen bitmap'in sadece 0..404 yüksekliğini alıp 84x84'e sıkıştırıp çizer.
+        processCanvas.drawBitmap(bitmap, scaleMatrix, paint)
 
-        val cropped = Bitmap.createBitmap(bitmap, 0, 0, croppedWidth, croppedHeight)
-
-        // 2. ADIM: YENİDEN BOYUTLANDIRMA (RESIZE)
-        // Şimdi kırpılmış görüntüyü 84x84 yapıyoruz.
-        val resized = Bitmap.createScaledBitmap(cropped, 84, 84, false)
+        // 3. Pixel Okuma
+        processBitmap.getPixels(pixels, 0, 84, 0, 0, 84, 84)
 
         val w = 84
         val h = 84
         val arr = FloatArray(w * h)
-        val pixels = IntArray(w * h)
 
-        resized.getPixels(pixels, 0, w, 0, 0, w, h)
-
+        // 4. Threshold (Eşikleme)
         for (i in pixels.indices) {
             val p = pixels[i]
-
-            // RGB -> Gray conversion
             val r = (p shr 16) and 0xff
-            val g = (p shr 8) and 0xff
-            val b = p and 0xff
-            val gray = ((0.299 * r + 0.587 * g + 0.114 * b)).toInt()
 
-            // Python: image_data[image_data > 0] = 255
-            // Arka plan siyah (0), borular ve kuş aydınlık (255)
-            arr[i] = if (gray > 0) 255.0f else 0.0f
+            arr[i] = if (r > 1) 255.0f else 0.0f
         }
         return arr
     }
@@ -70,20 +78,22 @@ class DQNModel(val module: Module) {
             val frame = if (c < list.size) list[c] else list.last()
             System.arraycopy(frame, 0, data, c * w * h, frame.size)
         }
-        val inputTensor = Tensor.fromBlob(data, longArrayOf(1, channels.toLong(), h.toLong(), w.toLong()))
-        return inputTensor
+        return Tensor.fromBlob(data, longArrayOf(1, channels.toLong(), h.toLong(), w.toLong()))
     }
 
-    fun predictAction(bitmapFrame: Bitmap): Int {
-        val processed = preprocess(bitmapFrame)
-        appendFrame(processed)
-        if (frameStack.size < 4) {
-            while (frameStack.size < 4) frameStack.addLast(processed)
+    fun predictAction(rawScreenBitmap: Bitmap): Int {
+        val processed = preprocess(rawScreenBitmap)
+
+        if (frameStack.isEmpty()) {
+            repeat(4) { frameStack.addLast(processed) }
+        } else {
+            appendFrame(processed)
         }
+
         val input = getInputTensor()
         val outputs = module.forward(IValue.from(input)).toTensor()
         val scores = outputs.dataAsFloatArray
-        // argmax
+
         var best = 0
         var bestVal = scores[0]
         for (i in 1 until scores.size) {
