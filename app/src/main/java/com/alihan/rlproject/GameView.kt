@@ -37,7 +37,6 @@ class GameView @JvmOverloads constructor(
     fun initGame(viewWidth: Int, viewHeight: Int) {
         val assets = AssetLoader(context)
 
-        // AssetLoader artık resmi scale etmeden (orijinal boyutta) getirecek.
         bg = assets.loadBitmap("sprites/background-black.png")
         base = assets.loadBitmap("sprites/base.png")
         playerFrames = arrayOf(
@@ -53,11 +52,9 @@ class GameView @JvmOverloads constructor(
         matrix.postRotate(180f)
         pipeTop = Bitmap.createBitmap(rawPipe, 0, 0, rawPipe.width, rawPipe.height, matrix, false)
 
-        // Tam 288x512 boyutunda sanal ekran
         gameBitmap = Bitmap.createBitmap(LOGICAL_WIDTH, LOGICAL_HEIGHT, Bitmap.Config.ARGB_8888)
         gameCanvas = Canvas(gameBitmap)
 
-        // Bu sadece kullanıcının ekranda görmesi için scale, modele giden veriyi etkilemez.
         val sx = viewWidth.toFloat() / LOGICAL_WIDTH
         val sy = viewHeight.toFloat() / LOGICAL_HEIGHT
         scaleMatrix = Matrix()
@@ -82,11 +79,9 @@ class GameView @JvmOverloads constructor(
                 val canvas = holder.lockCanvas()
                 if (canvas != null) {
                     drawGame()
-                    // Ekrana çizerken büyüt (Kullanıcı için)
                     canvas.drawBitmap(gameBitmap, scaleMatrix, null)
                     holder.unlockCanvasAndPost(canvas)
                 }
-                // Oyunun insan gözü için akıcılığı (Modelden bağımsız)
                 try { Thread.sleep(16) } catch (e: InterruptedException) {}
             }
         }.apply { start() }
@@ -101,7 +96,6 @@ class GameView @JvmOverloads constructor(
     private fun drawGame() {
         if (!spritesReady) return
 
-        // Oyunu sanal ekrana (288x512) çiziyoruz.
         gameCanvas.drawBitmap(bg, 0f, 0f, null)
 
         for (i in gameState.upperPipes.indices) {
@@ -118,7 +112,6 @@ class GameView @JvmOverloads constructor(
         gameCanvas.drawBitmap(frame, gameState.playerX.toFloat(), gameState.playerY.toFloat(), null)
     }
 
-    // Modelin kullanacağı ham görüntü (288x512)
     fun captureFrame(): Bitmap? {
         if (!spritesReady) return null
         return gameBitmap

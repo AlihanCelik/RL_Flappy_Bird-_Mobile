@@ -6,8 +6,6 @@ import android.graphics.BitmapFactory
 
 class AssetLoader(private val ctx: Context) {
     fun loadBitmap(pathInAssets: String): Bitmap {
-        // Bu ayarlar Android'in resmi telefona göre büyütmesini engeller.
-        // Resim kaç pikselse (288px) öyle yüklenir.
         val opts = BitmapFactory.Options()
         opts.inScaled = false
 
